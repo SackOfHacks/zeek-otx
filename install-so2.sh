@@ -59,7 +59,7 @@ cat << EOF > /etc/cron.d/zeek-otx
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
  
-0 * * * * root python3 $OTX_PATH/zeek-otx.py >> /var/log/nsm/zeek-otx.log 2>&1
+0 * * * * root python3 $OTX_PATH/zeek-otx.py >> /var/log/zeek-otx.log 2>&1
 EOF
 
 
