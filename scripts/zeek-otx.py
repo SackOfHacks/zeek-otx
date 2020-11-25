@@ -9,16 +9,15 @@ from configparser import ConfigParser
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-# The URL is hard coded. I'm comfortable doing this since it's unlikely that
-# the URL will change without resulting in an API change that will require
-# changes to this script.
+# The AlienVault OTX Pulse URL is hard coded.
+# If it is ever to change, update the URL below:
 _URL = 'http://otx.alienvault.com/api/v1/pulses/subscribed'
 
-# zeek Intel file header format
+# Zeek Intel file header format
 _HEADER = b"#fields\tindicator\tindicator_type\tmeta.source\tmeta.url\tmeta.do_notice\tmeta.if_in\n"
 
-# Mapping of OTXv2 Indicator types to zeek Intel types, additionally,
-# identifies unsupported intel types to prevent errors in zeek.
+# Mapping of OTXv2 Indicator types to Zeek Intel types, additionally,
+# identifies unsupported intel types to prevent errors in Zeek.
 _MAP = {
     "IPv4": "Intel::ADDR",
     "IPv6": "Intel::ADDR",
@@ -75,7 +74,7 @@ def iter_pulses(key, mtime, limit=20):
 
 def map_indicator_type(indicator_type):
     '''
-    Maps an OTXv2 indicator type to a zeek Intel Framework type.
+    Maps an OTXv2 indicator type to a Zeek Intel Framework type.
     '''
 
     return _MAP.get(indicator_type)
@@ -83,7 +82,7 @@ def map_indicator_type(indicator_type):
 def main():
     '''Retrieve intel from OTXv2 API.'''
 
-    parser = ArgumentParser(description='AlienVault OTXv2 zeek Client')
+    parser = ArgumentParser(description='AlienVault OTXv2 Zeek Client')
     parser.add_argument('-c', '--config', 
                         help='configuration file path',
                         default='zeek-otx.conf')
