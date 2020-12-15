@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the zeek-otx install folder variable
-OTX_PATH="/opt/zeek/share/zeek-otx"
+OTX_PATH="/opt/bro/share/bro/site/otx"
 
 
 # Download OTX download and parse script files
@@ -33,11 +33,21 @@ echo "Configuring ZEEK OTX script files..."
 echo
 if [ -f $OTX_PATH/zeek-otx.conf ]; then
 	sed -i "s|api_key.*|api_key = $APIKEY|" $OTX_PATH/zeek-otx.conf
-	sed -i "s|outfile.*|outfile = /opt/bro/share/zeek/intel/intel.dat|" $OTX_PATH/zeek-otx.conf
+	sed -i "s|outfile.*|outfile = /opt/bro/share/zeek/intel/otx.dat|" $OTX_PATH/zeek-otx.conf
 fi 
 if [ -f $OTX_PATH/zeek-otx.py ];then
 	sed -i "s|default='zeek-otx.conf'|default='$OTX_PATH/zeek-otx.conf'|" $OTX_PATH/zeek-otx.py
 fi 
+
+
+# Add to local.bro
+echo "Adding @load to local.bro"
+if [[ ! `grep otx /opt/bro/share/zeek/site/local.bro` ]]; then
+        echo '@load site/otx' >> /opt/bro/share/zeek/site/local.bro
+else
+        echo "@load site/otx already exists in /opt/bro/share/zeek/site/local.bro!"
+fi
+
 
 
 # Run the OTX Pulse retrieval script for first time
