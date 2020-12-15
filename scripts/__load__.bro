@@ -3,5 +3,5 @@
 @load frameworks/files/hash-all-files
 
 redef Intel::read_files += {
-	fmt("%s/otx.dat", @DIR)
+	fmt("/opt/bro/share/zeek/intel/otx.dat", @DIR)
 };
