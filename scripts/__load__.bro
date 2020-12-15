@@ -2,6 +2,4 @@
 @load frameworks/intel/do_notice
 @load frameworks/files/hash-all-files
 
-redef Intel::read_files += {
-	fmt("/opt/bro/share/zeek/intel/otx.dat", @DIR)
-};
+redef Intel::read_files += { "/opt/bro/share/zeek/intel/otx.dat" };
