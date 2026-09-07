@@ -60,6 +60,34 @@ def clean_field(value):
     cleaned = _CONTROL_CHARS_RE.sub(' ', str(value))
     return cleaned.strip() or '-'
 
+def strip_scheme(url):
+    '''
+    Removes a leading scheme from a URL indicator.
+
+    Zeek's Intel::URL type stores the URL without its scheme. The strip is
+    anchored to the start of the string and applied once, because the previous
+    str.replace() was unanchored and global:
+
+      - a scheme repeated inside the URL was also removed, so
+        "http://a.test/r?u=http://b.test" became "a.test/r?u=b.test";
+      - an indicator with no scheme at all makes urlparse() report an empty
+        scheme, which reduced the search pattern to "://" and stripped that
+        separator wherever it appeared, so "a.test/r?u=http://b.test" became
+        "a.test/r?u=httpb.test".
+
+    Either rewrite silently corrupts the indicator, and a corrupted indicator
+    never matches, so the pulse is quietly not detected on.
+    '''
+
+    scheme = urlparse(url).scheme
+    if not scheme:
+        return url
+    # urlparse() lower-cases the scheme it reports, the indicator need not be.
+    prefix = '{0}://'.format(scheme)
+    if url[:len(prefix)].lower() == prefix:
+        return url[len(prefix):]
+    return url
+
 def _get(key, mtime, limit=20, next_request=''):
     '''
     Retrieves a result set from the OTXv2 API using the restrictions of
@@ -167,9 +195,7 @@ def main():
                     clean_field(do_notice),
                     clean_field(if_in)]
                 if fields[1] == "Intel::URL":
-                    parsed = urlparse(fields[0])
-                    fields[0] = parsed.geturl().replace(
-                        '{0}://'.format(parsed.scheme), '')
+                    fields[0] = strip_scheme(fields[0])
                 f.write(('\t'.join(fields) + '\n').encode('utf-8'))
 
     os.rename(outfile + '.tmp', outfile)
