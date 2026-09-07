@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import requests
 import sys
 import os
@@ -11,10 +12,24 @@ from urllib.parse import urlparse
 
 # The AlienVault OTX Pulse URL is hard coded.
 # If it is ever to change, update the URL below:
-_URL = 'http://otx.alienvault.com/api/v1/pulses/subscribed'
+#
+# HTTPS is mandatory: the API key travels in the X-OTX-API-KEY request header,
+# so a plaintext http:// scheme would disclose it to anyone on the network path
+# on every (hourly, by default) run.
+_URL = 'https://otx.alienvault.com/api/v1/pulses/subscribed'
+
+# Network timeout, in seconds, applied to every OTX API request. Without it a
+# stalled connection would hang the hourly cron job indefinitely.
+_TIMEOUT = 30
 
 # Zeek Intel file header format
 _HEADER = b"#fields\tindicator\tindicator_type\tmeta.source\tmeta.url\tmeta.do_notice\tmeta.if_in\n"
+
+# The Zeek Intel framework reads a tab-separated, newline-delimited file, so any
+# tab, newline or other control character inside a field would let a Pulse author
+# terminate the record early and append arbitrary indicators to the feed. Every
+# field is scrubbed with this before it is written.
+_CONTROL_CHARS_RE = re.compile(r'[\x00-\x1f\x7f]')
 
 # Mapping of OTXv2 Indicator types to Zeek Intel types, additionally,
 # identifies unsupported intel types to prevent errors in Zeek.
@@ -31,6 +46,20 @@ _MAP = {
     "FileHash-SHA256": "Intel::FILE_HASH",
 }
 
+def clean_field(value):
+    '''
+    Neutralises Zeek Intel field/record delimiters in a single field value.
+
+    Pulse content is authored by third parties, so it is untrusted input: an
+    unescaped tab or newline in a Pulse name, reference URL or indicator would
+    otherwise inject additional, fully attacker-chosen rows into the intel feed.
+    '''
+
+    if value is None:
+        return '-'
+    cleaned = _CONTROL_CHARS_RE.sub(' ', str(value))
+    return cleaned.strip() or '-'
+
 def _get(key, mtime, limit=20, next_request=''):
     '''
     Retrieves a result set from the OTXv2 API using the restrictions of
@@ -39,20 +68,34 @@ def _get(key, mtime, limit=20, next_request=''):
 
     headers = {'X-OTX-API-KEY': key}
     params = {'limit': limit, 'modified_since': mtime}
-    if next_request == '':
-        r = requests.get(_URL, headers=headers, params=params)
-    else:
-        r = requests.get(next_request, headers=headers)
+    try:
+        if next_request == '':
+            r = requests.get(_URL, headers=headers, params=params,
+                             timeout=_TIMEOUT)
+        else:
+            r = requests.get(next_request, headers=headers, timeout=_TIMEOUT)
+    except requests.RequestException as exc:
+        print("The OTX request failed: {0}".format(exc))
+        sys.exit(1)
 
     # Depending on the response code, return the valid response.
     if r.status_code == 200:
-        return r.json()
+        try:
+            return r.json()
+        except ValueError:
+            print("The OTX API returned a malformed (non-JSON) response.")
+            sys.exit(1)
     if r.status_code == 403:
         print("An invalid API key was specified.")
         sys.exit(1)
     if r.status_code == 400:
         print("An invalid request was made.")
         sys.exit(1)
+    # Any other status (429 rate limit, 5xx outage, ...) previously fell through
+    # and returned None, which surfaced as an opaque TypeError in the caller.
+    print("The OTX API returned an unexpected status: HTTP {0}.".format(
+        r.status_code))
+    sys.exit(1)
 
 def iter_pulses(key, mtime, limit=20):
     '''
@@ -62,15 +105,15 @@ def iter_pulses(key, mtime, limit=20):
     # Populate an initial result set, after this the API will generate the next
     # request in the loop for every iteration.
     initial_results = _get(key, mtime, limit)
-    for result in initial_results['results']:
+    for result in initial_results.get('results') or []:
         yield result
 
-    next_request = initial_results['next']
+    next_request = initial_results.get('next')
     while next_request:
         json_data = _get(key, mtime, next_request=next_request)
-        for result in json_data['results']:
+        for result in json_data.get('results') or []:
             yield result
-        next_request = json_data['next']
+        next_request = json_data.get('next')
 
 def map_indicator_type(indicator_type):
     '''
@@ -101,32 +144,33 @@ def main():
     with open(outfile + '.tmp', 'wb') as f:
         f.write(_HEADER)
         for pulse in iter_pulses(key, mtime):
-            # Intel description for notices
-            description = 'AlienVault OTXv2 - %s ID: %s Author: %s' % (
-                                pulse[u'name'], 
-                                pulse[u'id'], 
-                                pulse[u'author_name'])
-            # A lot of care has to go into creating this description.
-            # Tabs are removed to prevent zeek from throwing errors.
-            description = description.replace('\t', ' ')
-            for indicator in pulse[u'indicators']:
-                zeek_type = map_indicator_type(indicator[u'type'])
+            # Intel description for notices. Every interpolated value is Pulse
+            # author controlled, so the assembled description is scrubbed of
+            # delimiters before use.
+            description = clean_field(
+                'AlienVault OTXv2 - %s ID: %s Author: %s' % (
+                                pulse.get(u'name'), 
+                                pulse.get(u'id'), 
+                                pulse.get(u'author_name')))
+            for indicator in pulse.get(u'indicators') or []:
+                zeek_type = map_indicator_type(indicator.get(u'type'))
                 if zeek_type is None:
                     continue
                 try:
                     url = pulse[u'references'][0]
-                except IndexError:
+                except (IndexError, KeyError, TypeError):
                     url = 'https://otx.alienvault.com'
-                fields = [(indicator[u'indicator']),
+                fields = [clean_field(indicator.get(u'indicator')),
                     (zeek_type),
                     (description),
-                    (url),
-                    (do_notice),
-                    (if_in) + ('\n')]
+                    clean_field(url),
+                    clean_field(do_notice),
+                    clean_field(if_in)]
                 if fields[1] == "Intel::URL":
-                    url = urlparse(fields[0])
-                    fields[0] = url.geturl().replace('{0}://'.format(url.scheme), '')
-                f.write('\t'.join(fields).encode('utf-8'))
+                    parsed = urlparse(fields[0])
+                    fields[0] = parsed.geturl().replace(
+                        '{0}://'.format(parsed.scheme), '')
+                f.write(('\t'.join(fields) + '\n').encode('utf-8'))
 
     os.rename(outfile + '.tmp', outfile)
 
