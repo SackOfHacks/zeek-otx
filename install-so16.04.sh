@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+# The tree cloned below is executed as root, once immediately and then
+# hourly from cron, so it is pinned to a reviewed revision instead of
+# whatever main happens to point at when the installer is run. Bump this
+# deliberately, after reviewing the diff.
+OTX_REV="e45e64fb45c2f3351cb848a797816054d44f26c7"
+
 # Define the zeek-otx install folder variable
 OTX_PATH="/opt/bro/share/bro/site/otx"
 OTX_OUTFILE="/opt/bro/share/zeek/intel/otx.dat"
@@ -20,8 +26,18 @@ echo "Downloading zeek-otx script files ..."
 echo
 if [ ! -d "$OTX_PATH" ]; then
 	git clone https://github.com/SackOfHacks/zeek-otx.git "$OTX_PATH"
+	git -C "$OTX_PATH" checkout --quiet "$OTX_REV"
 else
 	echo "ZEEK-OTX files directory already exists!"
+fi
+
+# Checked on every run rather than only after a fresh clone: an aborted
+# clone still leaves the directory behind, and the branch above would then
+# skip straight past it and install whatever happens to be there.
+if [ "$(git -C "$OTX_PATH" rev-parse HEAD 2>/dev/null)" != "$OTX_REV" ]; then
+	echo "ERROR: $OTX_PATH is not at the pinned revision $OTX_REV." >&2
+	echo "Remove it and re-run, or bump OTX_REV." >&2
+	exit 1
 fi
 
 # Fail closed rather than continuing in the caller's working directory: the
