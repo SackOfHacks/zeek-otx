@@ -22,6 +22,13 @@ _URL = 'https://otx.alienvault.com/api/v1/pulses/subscribed'
 # stalled connection would hang the hourly cron job indefinitely.
 _TIMEOUT = 30
 
+# Mode applied to the generated Intel file. The feed enumerates exactly which
+# indicators the sensor watches for, which is precisely the list an attacker
+# with an unprivileged shell on the sensor wants in order to pick infrastructure
+# that is not covered. It is created non-world-readable rather than at whatever
+# umask the root cron job happens to run with.
+_OUTFILE_MODE = 0o640
+
 # Zeek Intel file header format
 _HEADER = b"#fields\tindicator\tindicator_type\tmeta.source\tmeta.url\tmeta.do_notice\tmeta.if_in\n"
 
@@ -169,7 +176,13 @@ def main():
 
     mtime = (datetime.now() - timedelta(days=days)).isoformat()
 
-    with open(outfile + '.tmp', 'wb') as f:
+    tmpfile = outfile + '.tmp'
+    # The mode argument to os.open() is masked by the umask, so it is also set
+    # explicitly. Both happen before any indicator is written, so the feed is
+    # never briefly world-readable.
+    fd = os.open(tmpfile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, _OUTFILE_MODE)
+    os.chmod(tmpfile, _OUTFILE_MODE)
+    with os.fdopen(fd, 'wb') as f:
         f.write(_HEADER)
         for pulse in iter_pulses(key, mtime):
             # Intel description for notices. Every interpolated value is Pulse
@@ -198,7 +211,7 @@ def main():
                     fields[0] = strip_scheme(fields[0])
                 f.write(('\t'.join(fields) + '\n').encode('utf-8'))
 
-    os.rename(outfile + '.tmp', outfile)
+    os.replace(tmpfile, outfile)
 
 if __name__ == '__main__':
     main()
