@@ -21,6 +21,9 @@ INSTALLER="install-so2.sh"
 # always leave the installer newer than the pin.
 PINNED_PATHS=(scripts)
 
+# The single quotes are load-bearing: "${OTX_REV:-...}" is the literal text
+# being matched in the installer, not something for this shell to expand.
+# shellcheck disable=SC2016
 pin=$(sed -n 's/^OTX_REV="${OTX_REV:-\([0-9a-f]\{40\}\)}"$/\1/p' "$INSTALLER")
 if [ -z "$pin" ]; then
 	echo "FAIL: could not find a 40-character OTX_REV pin in $INSTALLER." >&2
