@@ -1,0 +1,11 @@
+# zeek-otx.py needs exactly one third-party module.
+#
+# On Debian/Ubuntu sensors the distribution package is usually the better
+# choice, because it is what unattended-upgrades will keep patched:
+#
+#     apt-get install python3-requests
+#
+# Otherwise:
+#
+#     python3 -m pip install -r requirements.txt
+requests>=2.25.0

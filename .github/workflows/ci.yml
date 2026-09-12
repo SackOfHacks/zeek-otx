@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Compile
+        run: python -m compileall -q scripts/
+      - name: Lint
+        run: |
+          python -m pip install --quiet ruff
+          ruff check scripts/
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck install-so2.sh .github/check-pin.sh
+
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check-pin.sh diffs HEAD against the pinned commit, so it needs the
+          # history, not the default single-commit checkout.
+          fetch-depth: 0
+      - name: The installer pin must cover the code it installs
+        run: bash .github/check-pin.sh

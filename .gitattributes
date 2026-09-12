@@ -1,0 +1,4 @@
+# Everything here is consumed by Linux: bash installers, a cron-run Python
+# script, and Zeek policy files. A CRLF line ending in a shell script breaks its
+# shebang, so normalise to LF regardless of what a contributor's checkout does.
+* text=auto eol=lf

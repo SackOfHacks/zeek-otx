@@ -1,0 +1,11 @@
+# Generated intel feed, and the half-written file it is renamed from.
+*.dat
+*.dat.tmp
+
+# A configured copy of the config holds a live OTX API key. The tracked
+# scripts/zeek-otx.conf is the blank template; anything else is yours.
+zeek-otx.conf.local
+*.conf.bak
+
+__pycache__/
+*.py[cod]
