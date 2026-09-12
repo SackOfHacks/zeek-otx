@@ -10,10 +10,10 @@ set -euo pipefail
 # value on every run rather than only on a fresh clone. Review the diff first;
 # this is code that runs as root on a sensor.
 #
-# .github/workflows/ci.yml fails the build if anything under scripts/ or this
-# installer changes without the pin being bumped, which is how the pin went
-# stale the first time.
-OTX_REV="${OTX_REV:-37bd2a74b001e6c7f9b975b59f9b1fb297596cd4}"
+# .github/workflows/ci.yml fails the build if anything under scripts/ -- the
+# tree that actually lands on a sensor -- changes without this pin being
+# bumped, which is how the pin went stale the first time.
+OTX_REV="${OTX_REV:-d62e8cc067f8aba1a2b90c5eda881b042762b7a1}"
 
 OTX_URL="https://github.com/SackOfHacks/zeek-otx.git"
 
