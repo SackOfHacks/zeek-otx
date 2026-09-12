@@ -1,0 +1,9 @@
+# Rules are selected explicitly rather than left at ruff's default, so that a
+# new ruff release cannot turn a green build red without anyone changing code.
+#
+# E/W/F are pycodestyle and pyflakes (real errors and undefined names), I is
+# import ordering, B is bugbear's likely-bug checks.
+line-length = 100
+
+[lint]
+select = ["E", "W", "F", "I", "B"]
