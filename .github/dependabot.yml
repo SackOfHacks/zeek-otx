@@ -1,0 +1,24 @@
+# Dependabot keeps the two things this repository pins from going stale
+# silently: the single Python dependency, and the Actions used by CI.
+#
+# Note that this does NOT cover OTX_REV in install-so2.sh -- that pin points at
+# this repository's own history and is enforced by .github/check-pin.sh.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # The workflow pins actions by commit SHA, so without this the pins would
+  # never move and would quietly rot.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
